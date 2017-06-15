@@ -15,6 +15,8 @@ const amazon = {
     if (action.error) {
       return context.fail(action.error)
     }
+    // context.succeed indicates the Lambda function
+    // execution and all callbacks completed successfully
     return context.succeed({
       version: version || '1.0',
       sessionAttributes: event.session.attributes,
