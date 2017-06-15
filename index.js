@@ -1,98 +1,84 @@
-var helpers = require('./helpers')
+const amazon = require('./src/amazon')
+const alexa = require('./src/alexa')
 
-var SPEECH = {
-  launch: '<speak>Launching your custom Alexa skill</speak>'
-  sayHello: '<speak>Hello World</speak>',
-  sayGoodbye: '<speak>Goodbye</speak>',
+const APP = 'My App'
+const DESCRIPTION = 'My App Description'
+
+const SPEECH = {
+  launch: 'Launching your custom Alexa skill',
+  sayHello: 'Hello World',
+  sayGoodbye: 'Goodbye World',
 }
 
-exports.handler = function (event, context, cb) {
-  try {
-    console.log('event.session.application.applicationId='
-      + event.session.application.applicationId)
+const handleInit = (event, context) => {
+  console.log('Initialized')
+}
 
-    /**
-     * Uncomment this if statement and populate with your skill's application ID to
-     * prevent someone else from configuring a skill that sends requests to this function.
-     */
+const handleLaunch = (event, context) => {
+  const cardTitle = APP
+  const cardDescription = DESCRIPTION
+  const wordsToSay = SPEECH.launch
 
-    //  if (event.session.application.applicationId !== 'myamazon id') {
-    //      context.fail('Invalid Application ID')
-    //   }
+  const action = alexa.speakAndUpdateCard(cardTitle, cardDescription, wordsToSay, true)
+  amazon.dispatch(event, context, action)
+}
 
-    if (event.session.new) {
-      onSessionStarted({
-        requestId: event.request.requestId
-      }, event.session)
-    }
+const handleIntent = (event, context) => {
+  const intent = event.request.intent
 
-    if (event.request.type === 'LaunchRequest') {
-      onLaunch(event.request,
-        event.session,
-        function callback (sessionAttributes, speechletResponse) {
-          context.succeed(helpers.buildResponse(sessionAttributes, speechletResponse))
-        })
-    } else if (event.request.type === 'IntentRequest') {
-      onIntent(event.request,
-        event.session,
-        function callback (sessionAttributes, speechletResponse) {
-          context.succeed(helpers.buildResponse(sessionAttributes, speechletResponse))
-        })
-    } else if (event.request.type === 'SessionEndedRequest') {
-      onSessionEnded(event.request, event.session)
-      context.succeed()
-    }
-    cb(null, 'success msg')
-  } catch (e) {
-    context.fail('Exception: ' + e)
-    cb(new Error('failure'))
+  let wordsToSay
+  let action
+
+  switch (intent.name) {
+    case 'Hello':
+      wordsToSay = SPEECH.sayHello
+      action = alexa.speak(wordsToSay, true)
+      amazon.dispatch(event, context, action)
+      break
+    case 'Goodbye':
+      wordsToSay = SPEECH.sayGoodbye
+      action = alexa.speak(wordsToSay, true)
+      amazon.dispatch(event, context, action)
+      break
+    default:
   }
 }
 
-function onSessionStarted (sessionStartedRequest, session) {
-  console.log('onSessionStarted requestId=' + sessionStartedRequest.requestId + ', sessionId=' + session.sessionId)
-  // add any session init logic here
-}
-
-function onLaunch (launchRequest, session, callback) {
-  console.log('onLaunch requestId=' + launchRequest.requestId + ', sessionId=' + session.sessionId)
-
-  var cardTitle = 'My Custom Alexa Skill'
-  var speechOutput = SPEECH.launch
-  callback(session.attributes,
-    helpers.buildSpeechletResponse(cardTitle, speechOutput, '', true))
-}
-
-function onIntent (intentRequest, session, callback) {
-  console.log('onIntent requestId=' + intentRequest.requestId + ', sessionId=' + session.sessionId)
-
-  /* eslint-disable one-var */
-  var intent = intentRequest.intent,
-    intentName = intentRequest.intent.name
-  /* eslint-enable one-var */
-
-  if (intentName === 'Hello') {
-    handleHello(intent, session, callback)
-  }
-  if (intentName === 'Goodbye') {
-    handleGoodbye(intent, session, callback)
-  }
+const handleEndSession = (event, context) => {
+  // cleanup
 }
 
 /*
- * Called when the user ends the session.
- */
-function onSessionEnded (sessionEndedRequest, session) {
-  console.log('onSessionEnded requestId=' + sessionEndedRequest.requestId + ', sessionId=' + session.sessionId)
-  // Add any cleanup logic here
+  Amazon Echo Lifecycle ----------------------
+*/
+
+const LAUNCH = 'LaunchRequest'
+const INTENT = 'IntentRequest'
+const END = 'SessionEndedRequest'
+
+const handler = (event, context, cb) => {
+  try {
+    // runs once on startup
+    amazon.onStartSession(event, context, handleInit)
+
+    const requestType = event.request.type
+
+    switch (requestType) {
+      case LAUNCH:
+        amazon.onLaunch(event, context, handleLaunch)
+        break
+      case INTENT:
+        amazon.onIntent(event, context, handleIntent)
+        break
+      case END:
+        amazon.onSessionEnd(event, context, handleEndSession)
+        break
+      default:
+    }
+  } catch (e) {
+    const action = { error: `Exception: ${e}` }
+    amazon.dispatch(event, context, action)
+  }
 }
 
-function handleHello (intent, session, callback) {
-  callback(session.attributes,
-    helpers.buildSpeechletResponseWithoutCard(SPEECH.sayHello, '', 'true'))
-}
-
-function handleGoodbye (intent, session, callback) {
-  callback(session.attributes,
-    helpers.buildSpeechletResponseWithoutCard(SPEECH.turnLightOff, '', 'true'))
-}
+module.exports = { handler }
